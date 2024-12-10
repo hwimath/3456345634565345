@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>휘매쓰 연산 챌린지!</title>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f7;
+            color: #333;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #4a90e2;
+            color: white;
+            padding: 20px 0;
+            font-size: 2em;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #main {
+            padding: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+        .difficulty-btn {
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .difficulty-btn:hover {
+            background-color: #3a78c2;
+            color: white;
+        }
+        #game-area {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        #energy-bar {
+            width: 100%;
+            height: 25px;
+            background-color: #ddd;
+            border-radius: 12.5px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        #energy-fill {
+            height: 100%;
+            width: 100%;
+            background-color: #4caf50;
+            transition: width 1s linear;
+        }
+        #question {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+        .choices {
+            list-style: none;
+            padding: 0;
+        }
+        .choices li {
+            margin: 10px 0;
+        }
+        .choice-btn {
+            width: 100%;
+            padding: 10px;
+            font-size: 1.1em;
+            border: 2px solid #4a90e2;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .choice-btn:hover {
+            background-color: #4a90e2;
+            color: white;
+        }
+        #score, #lives, #total-time {
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+        #result {
+            font-size: 1.3em;
+            margin-top: 20px;
+            color: red;
+        }
+        /* Popup Styles */
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            border: 2px solid #4a90e2;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+        .popup.active {
+            display: block;
+        }
+        .popup button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            border: none;
+            background-color: #4a90e2;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .overlay {
+            position: fixed;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            display: none;
+        }
+        .overlay.active {
+            display: block;
+        }
+        /* Timer Styles */
+        #timer {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            .difficulty-btn {
+                width: 80%;
+                font-size: 1em;
+            }
+            #question {
+                font-size: 1.3em;
+            }
+            .choice-btn {
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>휘매쓰 연산 챌린지!</header>
+    <div id="main">
+        <!-- Difficulty Selection Screen -->
+        <div id="start-screen">
+            <h2>난이도를 선택하세요</h2>
+            <button class="difficulty-btn" data-difficulty="최상">최상 (20초)</button>
+            <button class="difficulty-btn" data-difficulty="상">상 (30초)</button>
+            <button class="difficulty-btn" data-difficulty="중">중 (40초)</button>
+            <button class="difficulty-btn" data-difficulty="하">하 (시간제한 없음)</button>
+        </div>
+
+        <!-- Game Area -->
+        <div id="game-area" class="hidden">
+            <div id="score">점수: 0</div>
+            <div id="lives">남은 기회: 3</div>
+            <div id="total-time">총 시간: 0초</div>
+            <div id="energy-bar">
+                <div id="energy-fill"></div>
+            </div>
+            <div id="timer"></div>
+            <div id="question"></div>
+            <ul class="choices">
+                <li><button class="choice-btn" data-choice="1"></button></li>
+                <li><button class="choice-btn" data-choice="2"></button></li>
+                <li><button class="choice-btn" data-choice="3"></button></li>
+                <li><button class="choice-btn" data-choice="4"></button></li>
+            </ul>
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <!-- Popup and Overlay -->
+    <div class="overlay" id="overlay"></div>
+    <div class="popup" id="popup">
+        <div id="popup-message"></div>
+        <button onclick="closePopup()">확인</button>
+    </div>
+
+    <script>
+        // Math Problems Data
+        const problems = [
+            { question: '(+1) \\times (-2)', answer: '-2', type: 'integer' },
+            { question: '(+7) \\times (+2)', answer: '14', type: 'integer' },
+            { question: '(-10) \\times (-2)', answer: '20', type: 'integer' },
+            { question: '(-6) \\times (-8)', answer: '48', type: 'integer' },
+            { question: '(-9) \\times (+5)', answer: '-45', type: 'integer' },
+            { question: '0 \\times (-10)', answer: '0', type: 'integer' },
+            { question: '\\left(+ \\dfrac{2}{5}\\right) \\times \\left(+ \\dfrac{15}{4}\\right)', answer: '\\dfrac{3}{2}', type: 'fraction' },
+            { question: '\\left(+ \\dfrac{4}{3}\\right) \\times \\left(- \\dfrac{21}{8}\\right)', answer: '-\\dfrac{7}{2}', type: 'fraction' },
+            { question: '(+2.5) \\times (-0.4)', answer: '-1', type: 'integer' },
+            { question: '(+5) \\times (+6)', answer: '30', type: 'integer' },
+            { question: '(-8) \\times (-7)', answer: '56', type: 'integer' },
+            { question: '(-11) \\times (+3)', answer: '-33', type: 'integer' },
+            { question: '\\left(+ \\dfrac{1}{4}\\right) \\times \\left(+ \\dfrac{2}{5}\\right)', answer: '\\dfrac{1}{10}', type: 'fraction' },
+            { question: '\\left(+ \\dfrac{7}{3}\\right) \\times \\left(- \\dfrac{1}{14}\\right)', answer: '-\\dfrac{1}{6}', type: 'fraction' },
+            { question: '\\left(- \\dfrac{8}{9}\\right) \\times \\left(+ \\dfrac{3}{16}\\right)', answer: '-\\dfrac{1}{6}', type: 'fraction' },
+            { question: '\\left(- \\dfrac{5}{14}\\right) \\times \\left(- \\dfrac{7}{10}\\right)', answer: '\\dfrac{1}{4}', type: 'fraction' },
+            { question: '(-3) \\times \\left(- \\dfrac{4}{21}\\right)', answer: '\\dfrac{4}{7}', type: 'fraction' },
+            { question: '(+0.7) \\times (-5)', answer: '-3.5', type: 'decimal' },
+            { question: '(-3) \\times (-0.9)', answer: '2.7', type: 'decimal' },
+            { question: '\\left(- \\dfrac{2}{9}\\right) \\times (-0.3)', answer: '\\dfrac{1}{15}', type: 'fraction' },
+            { question: '\\left(- \\dfrac{16}{9}\\right) \\times (-6)', answer: '\\dfrac{32}{3}', type: 'fraction' },
+            { question: '\\left(- \\dfrac{8}{7}\\right) \\times \\left(+ \\dfrac{35}{2}\\right)', answer: '-20', type: 'integer' },
+            { question: '(-1.2) \\times \\left(+ \\dfrac{1}{3}\\right)', answer: '-0.4', type: 'decimal' },
+            { question: '\\left(- \\dfrac{10}{3}\\right) \\times \\left(+ \\dfrac{12}{5}\\right)', answer: '-8', type: 'integer' },
+            { question: '\\left(- \\dfrac{10}{9}\\right) \\times \\left(+ \\dfrac{7}{15}\\right)', answer: '-\\dfrac{14}{27}', type: 'fraction' },
+            { question: '\\left(- \\dfrac{15}{16}\\right) \\times \\left(- \\dfrac{20}{27}\\right)', answer: '\\dfrac{25}{36}', type: 'fraction' },
+            { question: '(-3) \\times (-4) \\times (+5)', answer: '60', type: 'integer' },
+            { question: '(-49) \\div (-7)', answer: '7', type: 'integer' },
+            { question: '(+63) \\div (+7)', answer: '9', type: 'integer' },
+            { question: '(+15) \\div (+3)', answer: '5', type: 'integer' },
+            { question: '(+42) \\div (-7)', answer: '-6', type: 'integer' },
+            { question: '(-18) \\div (-9)', answer: '2', type: 'integer' },
+            { question: '(+9) \\div (-3)', answer: '-3', type: 'integer' },
+            { question: '(+20) \\div (-4)', answer: '-5', type: 'integer' },
+            { question: '(-48) \\div (-6)', answer: '8', type: 'integer' },
+            { question: '(-24) \\div (+6)', answer: '-4', type: 'integer' },
+            { question: '0 \\div (+10)', answer: '0', type: 'integer' },
+            { question: '(-3.6) \\div (-0.9)', answer: '4', type: 'integer' },
+            { question: '(+3) \\div (-18)', answer: '-\\dfrac{1}{6}', type: 'fraction' },
+            { question: '(-2) \\div (+16)', answer: '-\\dfrac{1}{8}', type: 'fraction' },
+            { question: '(-14) \\div (-2)', answer: '7', type: 'integer' },
+            { question: '(-35) \\div (+7)', answer: '-5', type: 'integer' },
+            { question: '(+3) \\div (-\\dfrac{3}{4})', answer: '-4', type: 'integer' },
+            { question: '(+\\dfrac{1}{4}) \\div (-\\dfrac{5}{12})', answer: '-\\dfrac{3}{5}', type: 'fraction' },
+            { question: '(-\\dfrac{3}{5}) \\div (-\\dfrac{3}{20})', answer: '4', type: 'integer' },
+            { question: '(+1.8) \\div (-\\dfrac{9}{4})', answer: '-0.8', type: 'decimal' },
+            { question: '(-32) \\div (-8)', answer: '4', type: 'integer' },
+            { question: '(+\\dfrac{1}{4}) \\div (+\\dfrac{7}{8})', answer: '\\dfrac{2}{7}', type: 'fraction' },
+            { question: '(+\\dfrac{5}{3}) \\div (-\\dfrac{2}{9})', answer: '-7.5', type: 'decimal' },
+            { question: '(-\\dfrac{15}{8}) \\div (-\\dfrac{5}{4})', answer: '1.5', type: 'decimal' },
+            { question: '(-\\dfrac{5}{12}) \\div (-\\dfrac{10}{3})', answer: '\\dfrac{1}{8}', type: 'fraction' },
+            { question: '(-12) \\div (-6) \\times (-5)', answer: '-10', type: 'integer' },
+            { question: '(-\\dfrac{4}{5}) \\times (-10) \\div (+8)', answer: '1', type: 'integer' },
+            { question: '(+10) \\times (-\\dfrac{5}{12}) \\div (+5)', answer: '-\\dfrac{5}{6}', type: 'fraction' },
+            { question: '(+8) \\div (+\\dfrac{1}{6}) \\times (-\\dfrac{1}{12})', answer: '-4', type: 'integer' },
+            { question: '(-\\dfrac{4}{5}) \\div (-\\dfrac{2}{7}) \\times (+20)', answer: '56', type: 'integer' },
+            { question: '4 \\times \\dfrac{3}{8} \\div (-\\dfrac{6}{5})', answer: '-1.25', type: 'decimal' },
+            { question: '(-8) \\div \\dfrac{4}{5} \\times \\dfrac{3}{10}', answer: '-3', type: 'integer' },
+            { question: '(+3) \\div (-\\dfrac{9}{4}) \\times (-5)', answer: '6.6667', type: 'decimal' },
+            { question: '\\dfrac{5}{6} \\times (-\\dfrac{3}{8}) \\div (-\\dfrac{10}{9})', answer: '\\dfrac{9}{32}', type: 'fraction' },
+            { question: '(-\\dfrac{12}{5}) \\div (-\\dfrac{3}{4}) \\times \\dfrac{15}{4}', answer: '12', type: 'integer' },
+            { question: '(-\\dfrac{8}{15}) \\times (-\\dfrac{27}{32}) \\div (-\\dfrac{12}{25})', answer: '-\\dfrac{15}{16}', type: 'fraction' },
+            { question: '(-\\dfrac{16}{9}) \\div (-\\dfrac{5}{2}) \\times (-\\dfrac{3}{8})', answer: '-\\dfrac{4}{15}', type: 'fraction' },
+            { question: '(-\\dfrac{5}{4}) \\div (-\\dfrac{10}{3}) \\times (+\\dfrac{5}{6})', answer: '\\dfrac{5}{8}', type: 'fraction' },
+            { question: '(-\\dfrac{3}{8}) \\div (+1.5) \\times (-\\dfrac{8}{5})', answer: '0.4', type: 'decimal' },
+            { question: '(+4.8) \\div (-\\dfrac{12}{5}) \\times (-0.2)', answer: '0.4', type: 'decimal' }
+        ];
+
+        let shuffledProblems = [];
+        let currentProblemIndex = 0;
+        let score = 0;
+        let lives = 3;
+        let totalTime = 0;
+        let gameInterval;
+        let questionTimer;
+        let energyFill;
+        let energyDuration;
+        let energyInterval;
+        let difficulty;
+        let pointsPerCorrect;
+        let energyBarActive = true;
+
+        const startScreen = document.getElementById('start-screen');
+        const gameArea = document.getElementById('game-area');
+        const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
+        const totalTimeDisplay = document.getElementById('total-time');
+        const questionDisplay = document.getElementById('question');
+        const choicesList = document.querySelectorAll('.choice-btn');
+        const resultDisplay = document.getElementById('result');
+        const energyBar = document.getElementById('energy-bar');
+        energyFill = document.getElementById('energy-fill');
+        const timerDisplay = document.getElementById('timer');
+
+        const overlay = document.getElementById('overlay');
+        const popup = document.getElementById('popup');
+        const popupMessage = document.getElementById('popup-message');
+
+        // Initialize MathJax
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+
+        // Difficulty Settings
+        const difficultySettings = {
+            '최상': { time: 20, points: 20 },
+            '상': { time: 30, points: 15 },
+            '중': { time: 40, points: 13 },
+            '하': { time: Infinity, points: 10 }
+        };
+
+        // Shuffle Problems
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // Start Game
+        document.querySelectorAll('.difficulty-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                difficulty = button.getAttribute('data-difficulty');
+                energyDuration = difficultySettings[difficulty].time;
+                pointsPerCorrect = difficultySettings[difficulty].points;
+                startScreen.classList.add('hidden');
+                gameArea.classList.remove('hidden');
+                startGame();
+            });
+        });
+
+        function startGame() {
+            shuffledProblems = shuffle([...problems]);
+            currentProblemIndex = 0;
+            score = 0;
+            lives = 3;
+            totalTime = 0;
+            updateDisplay();
+            displayProblem();
+            gameInterval = setInterval(() => {
+                totalTime++;
+                totalTimeDisplay.textContent = `총 시간: ${totalTime}초`;
+            }, 1000);
+            if (difficulty !== '하') {
+                startEnergyBar();
+            }
+        }
+
+        function startEnergyBar() {
+            energyFill.style.width = '100%';
+            let timeLeft = energyDuration;
+            energyInterval = setInterval(() => {
+                if (timeLeft > 0) {
+                    timeLeft--;
+                    let percentage = (timeLeft / energyDuration) * 100;
+                    energyFill.style.width = `${percentage}%`;
+                } else {
+                    clearInterval(energyInterval);
+                    loseLife();
+                }
+            }, 1000);
+        }
+
+        function resetEnergyBar() {
+            if (difficulty !== '하') {
+                clearInterval(energyInterval);
+                startEnergyBar();
+            }
+        }
+
+        function loseLife() {
+            lives--;
+            updateDisplay();
+            showResult(`시간 초과! 정답은 $${shuffledProblems[currentProblemIndex].answer}$였습니다.`);
+            triggerPopup();
+            if (lives > 0) {
+                displayProblem();
+            } else {
+                endGame();
+            }
+        }
+
+        function updateDisplay() {
+            scoreDisplay.textContent = `점수: ${score}`;
+            livesDisplay.textContent = `남은 기회: ${lives}`;
+        }
+
+        function displayProblem() {
+            if (currentProblemIndex >= shuffledProblems.length) {
+                shuffledProblems = shuffle([...problems]);
+                currentProblemIndex = 0;
+            }
+            const problem = shuffledProblems[currentProblemIndex];
+            questionDisplay.innerHTML = `문제 ${currentProblemIndex + 1}: $${problem.question}$`;
+            generateChoices(problem);
+            resultDisplay.textContent = '';
+            if (difficulty !== '하') {
+                resetEnergyBar();
+            }
+        }
+
+        function generateChoices(problem) {
+            let choices = [problem.answer];
+            while (choices.length < 4) {
+                let randomProblem = problems[Math.floor(Math.random() * problems.length)];
+                if (randomProblem.answer !== problem.answer && !choices.includes(randomProblem.answer)) {
+                    choices.push(randomProblem.answer);
+                }
+            }
+            choices = shuffle(choices);
+            choicesList.forEach((btn, index) => {
+                btn.textContent = `$${choices[index]}$`;
+                btn.dataset.correct = (choices[index] === problem.answer) ? 'true' : 'false';
+            });
+            MathJax.typesetPromise();
+        }
+
+        choicesList.forEach(button => {
+            button.addEventListener('click', () => {
+                if (difficulty !== '하') {
+                    clearInterval(energyInterval);
+                }
+                const isCorrect = button.dataset.correct === 'true';
+                if (isCorrect) {
+                    score += pointsPerCorrect;
+                    updateDisplay();
+                    showResult('정답입니다!');
+                    triggerPopup();
+                } else {
+                    lives--;
+                    showResult(`틀렸습니다! 정답은 $${shuffledProblems[currentProblemIndex].answer}$였습니다.`);
+                    triggerPopup();
+                    updateDisplay();
+                }
+                if (lives > 0) {
+                    currentProblemIndex++;
+                    displayProblem();
+                } else {
+                    endGame();
+                }
+            });
+        });
+
+        function showResult(message) {
+            resultDisplay.innerHTML = message;
+            MathJax.typesetPromise();
+        }
+
+        function endGame() {
+            clearInterval(gameInterval);
+            if (difficulty !== '하') {
+                clearInterval(energyInterval);
+            }
+            gameArea.classList.add('hidden');
+            showPopup('게임 종료!', `최종 점수: ${score}점<br>총 시간: ${totalTime}초`);
+        }
+
+        // Popups with Probability
+        function triggerPopup() {
+            const rand = Math.random();
+            if (rand < 1/10000) {
+                showPopup('축하합니다!', '5000원 상품권을 받았습니다!');
+            } else if (rand < 1/1000) {
+                showPopup('축하합니다!', '3000원 상품권을 받았습니다!');
+            } else if (rand < 1/500) {
+                showPopup('축하합니다!', '1회 면제권을 받았습니다!');
+            }
+        }
+
+        function showPopup(title, message) {
+            overlay.classList.add('active');
+            popup.classList.add('active');
+            popupMessage.innerHTML = `<strong>${title}</strong><br>${message}`;
+        }
+
+        function closePopup() {
+            overlay.classList.remove('active');
+            popup.classList.remove('active');
+        }
+
+        // Random Questions Indefinitely
+        // Already handled by reshuffling when all problems are done
+
+    </script>
+</body>
+</html>
